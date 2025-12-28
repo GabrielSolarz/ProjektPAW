@@ -74,10 +74,49 @@ function startCountdown() {
     if (el) el.innerHTML = `Do następnego GP: ${days}d ${hours}h ${mins}m ${secs}s`;
   }, 1000);
 }
-function renderCalendar() {
-  document.getElementById("app").innerHTML = "<h2>Kalendarz sezonu</h2><p>Ładowanie...</p>";
-}
+async function renderCalendar() {
+  const app = document.getElementById("app");
+  app.innerHTML = "<h2>Kalendarz sezonu</h2><p>Pobieranie harmonogramu wyścigów 2025...</p>";
 
+  try {
+    const response = await fetch('https://api.openf1.org/v1/sessions?year=2025');
+    const sessions = await response.json();
+
+    const races = sessions
+      .filter(s => s.session_name === "Race")
+      .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+
+    if (races.length === 0) {
+        app.innerHTML = "<h2>Kalendarz F1 2025</h2><p>Harmonogram na sezon 2025 nie jest jeszcze dostępny w API.</p>";
+        return;
+    }
+
+    let html = '<h2>Kalendarz F1 2025</h2><div class="calendar-list">';
+
+    races.forEach(race => {
+      const raceDate = new Date(race.date_start).toLocaleDateString('pl-PL', {
+        day: '2-digit',
+        month: '2-digit'
+      });
+
+      html += `
+        <div class="race-card">
+          <div class="race-date">${raceDate}</div>
+          <div class="race-info">
+            <div class="race-main-info">
+              <span class="race-location">${race.location}</span>
+              <span class="race-country">${race.country_name}</span>
+            </div>
+            <span class="race-circuit">Nazwa toru: ${race.circuit_short_name}</span>
+          </div>
+        </div>`;
+    });
+
+    app.innerHTML = html + "</div>";
+  } catch (error) {
+    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się załadować danych.</p>";
+  }
+}
 function renderStandings() {
   document.getElementById("app").innerHTML = "<h2>Klasyfikacje</h2><p>Ładowanie...</p>";
 }
@@ -85,12 +124,60 @@ function renderStandings() {
 function renderWinners() {
   document.getElementById("app").innerHTML = "<h2>Zwycięzcy wyścigów</h2><p>Ładowanie...</p>";
 }
-function renderDrivers() {
-  document.getElementById("app").innerHTML = "<h2>Dane kierowców</h2><p>Ładowanie danych o kierowcach...</p>";
+async function renderDrivers() {
+  const app = document.getElementById("app");
+  app.innerHTML = "<h2>Kierowcy</h2><p>Pobieranie danych z toru...</p>";
+
+  try {
+    const response = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
+    const drivers = await response.json();
+
+
+    const uniqueDrivers = Array.from(new Map(drivers.map(d => [d.driver_number, d])).values());
+
+    let html = "<h2>Kierowcy (Ostatnia sesja)</h2><div class='grid'>";
+    uniqueDrivers.forEach(d => {
+      html += `
+        <div class="driver-card" style="border-left-color: #${d.team_colour}">
+          <a> </a><strong> ${d.full_name}</strong> (${d.driver_number})<br>
+          <small>${d.team_name}</small>
+        </div>`;
+    });
+    app.innerHTML = html + "</div>";
+  } catch (e) {
+    app.innerHTML = "<p>Błąd ładowania kierowców. Sprawdź połączenie.</p>";
+  }
 }
 
-function renderConstructors() {
-  document.getElementById("app").innerHTML = "<h2>Dane konstruktorów</h2><p>Ładowanie danych o konstruktorach...</p>";
+async function renderConstructors() {
+  const app = document.getElementById("app");
+  app.innerHTML = "<h2>Konstruktorzy</h2><p>Pobieranie listy zespołów...</p>";
+
+  try {
+    const response = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
+    const data = await response.json();
+    const teamsMap = new Map();
+    data.forEach(d => {
+      if (!teamsMap.has(d.team_name)) {
+        teamsMap.set(d.team_name, { name: d.team_name, color: d.team_colour });
+      }
+    });
+
+    let html = '<h2>Zespoły F1 (Sezon 2025)</h2><div class="constructors-list">';
+
+    teamsMap.forEach(team => {
+
+      html += `
+        <div class="constructor-card" style="border-left-color: #${team.color}">
+          <h3 class="constructor-name">${team.name}</h3>
+          <p class="constructor-info">Official F1 Constructor</p>
+        </div>`;
+    });
+
+    app.innerHTML = html + "</div>";
+  } catch (error) {
+    app.innerHTML = "<p>Błąd pobierania danych o konstruktorach.</p>";
+  }
 }
 
 function renderCircuits() {
@@ -98,7 +185,45 @@ function renderCircuits() {
 }
 
 function renderBasics() {
-  document.getElementById("app").innerHTML = "<h2>Podstawowa wiedza F1</h2><p>Tutaj znajdziesz podstawowe informacje o Formule 1.</p>";
+  const app = document.getElementById("app");
+
+  const glossary = [
+    { term: "Airbox", definition: "Wlot powietrza silnika i zarazem element wykorzystywany jako obręcz dachowania." },
+    { term: "Aleja serwisowa", definition: "Wydzielony obszar z pasem serwisowym i garażami, gdzie kierowcy wymieniają opony, naprawiają bolidy i zmieniają ustawienia." },
+    { term: "Blistering", definition: "Zjawisko „łuszczenia się” opon na skutek przegrzania, prowadzące do odpadania kawałków gumy." },
+    { term: "CFD", definition: "Computational Fluid Dynamics – technologia symulacji przepływu powietrza, wspierająca prace w tunelu aerodynamicznym." },
+    { term: "Deflektor", definition: "Element między przednimi kołami a środkiem auta, kierujący strugi powietrza w celu poprawy aerodynamiki." },
+    { term: "DRS", definition: "Drag Reduction System – system ruchomego skrzydła redukujący opór powietrza, ułatwiający wyprzedzanie na prostych." },
+    { term: "FIA", definition: "Federation Internationale del’Automobile – międzynarodowa federacja samochodowa regulująca wyścigi F1." },
+    { term: "HANS", definition: "Head And Neck Support – system z włókna węglowego chroniący głowę i kark kierowcy podczas wypadków." },
+    { term: "KERS", definition: "System hamowania rekuperacyjnego, odzyskujący energię kinetyczną podczas hamowania." },
+    { term: "Nadsterowność", definition: "Utrata przyczepności tylnej osi w zakręcie, powodująca uciekanie tyłu bolidu na zewnątrz." },
+    { term: "Opona slick", definition: "Gładkie ogumienie bez bieżnika, przeznaczone do jazdy po suchej nawierzchni dla maksymalnej przyczepności." },
+    { term: "Pit Stop", definition: "Zjazd do alei serwisowej na wymianę opon lub naprawę, trwający zazwyczaj około 2-3 sekundy." },
+    { term: "Pole Position", definition: "Pierwsze miejsce na starcie wyścigu, zdobywane przez najszybszego kierowcę w kwalifikacjach." },
+    { term: "Safety car", definition: "Samochód bezpieczeństwa prowadzący stawkę i ograniczający tempo w razie niebezpieczeństwa na torze." },
+    { term: "Telemetria", definition: "System zdalnego przesyłania danych z czujników bolidu do inżynierów w czasie rzeczywistym." }
+  ];
+
+  // Sortowanie alfabetyczne
+  glossary.sort((a, b) => a.term.localeCompare(b.term));
+
+  let html = `
+    <h2>Słowniczek pojęć F1</h2>
+    <p>Opanuj techniczny język Formuły 1. Oto kluczowe terminy, które musisz znać:</p>
+    <div class="glossary-container">
+  `;
+
+  glossary.forEach(item => {
+    html += `
+      <div class="term-card">
+        <span class="term-title">${item.term}</span>
+        <p class="term-definition">${item.definition}</p>
+      </div>
+    `;
+  });
+
+  app.innerHTML = html + "</div>";
 }
 
 function renderNotFound() {

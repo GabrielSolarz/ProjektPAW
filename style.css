@@ -74,7 +74,7 @@ a {
   text-decoration: none;
 }
 footer {
-  flex-shrink: 0; /* Zapobiega ściskaniu stopki przez flexbox */
+  flex-shrink: 0;
   text-align: center;
   padding: 1rem;
   background: #111;
@@ -85,9 +85,131 @@ a:hover {
   text-decoration: underline;
 }
 nav ul li a.active {
-    color: #ff1801; /* Kolor F1 */
+    color: #ff1801;
     font-weight: bold;
     border-bottom: 2px solid #ff1801;
+}
+.driver-card {
+    border-left: 6px solid;
+    padding-left: 25px;
+    margin-bottom: 15px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    transition: transform 0.2s;
+}
+
+.driver-card:hover {
+    transform: translateX(5px);
+    background-color: #f9f9f9;
+}
+.constructors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+
+.constructor-card {
+  background-color: #fafafa;
+  border-radius: 4px;
+  padding: 15px 15px 15px 30px; /* 30px to Twój odstęp od koloru */
+  border-left: 8px solid #ccc;  /* Domyślny kolor, nadpiszemy go w JS */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.constructor-card:hover {
+  transform: translateX(5px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  background-color: #fff;
+}
+
+.constructor-name {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #111;
+}
+
+.constructor-info {
+  margin: 5px 0 0 0;
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.calendar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.race-main-info {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.race-location {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #111;
+}
+.race-country {
+  font-size: 0.9rem;
+  color: #666;
+  text-transform: uppercase;
+  background-color: #f0f0f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.race-circuit {
+  display: block;
+  font-size: 0.85rem;
+  color: #e10600; 
+  font-style: italic;
+}
+
+.glossary-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+  align-items: start; 
+  margin-top: 25px;
+}
+
+.term-card {
+  background: #ffffff;
+  border-radius: 6px;
+  border-left: 4px solid #e10600;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+}
+
+.term-card:hover {
+  border-left-width: 10px; 
+  background-color: #fffafa;
+}
+.term-title {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #111;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.term-definition {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #444;
+  margin: 0;
 }
 
 /* Responsywność */
