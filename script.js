@@ -1,5 +1,6 @@
 const routes = {
   "/": renderHome,
+  "/index.html": renderHome,
   "/drivers": renderDrivers,     
   "/constructors": renderConstructors, 
   "/circuits": renderCircuits,     
@@ -41,7 +42,10 @@ function handleRoute() {
 function renderHome() {
   document.getElementById("app").innerHTML = `
     <section>
-      <h2>Witaj w F1 Season Summary</h2>
+      <h2>Witaj w F1Results</h2>
+      <div id="countdown" style="background: #111; color: #e10600; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem; font-family: monospace; font-size: 1.5rem;">
+        Ładowanie czasu do GP...
+      </div>
       <p>Ta aplikacja prezentuje dane o sezonie Formuły 1 z <a href="https://openf1.org">OpenF1 API</a>.</p>
       <ul>
           <li><a href="/drivers" data-route>Lista Kierowców</a></li> 
@@ -54,6 +58,21 @@ function renderHome() {
       </ul>
     </section>
   `;
+  startCountdown();
+}
+function startCountdown() {
+  const target = new Date("March 8, 2026 15:00:00").getTime();
+  setInterval(() => {
+    const now = new Date().getTime();
+    const diff = target - now;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+    const el = document.getElementById("countdown");
+    if (el) el.innerHTML = `Do następnego GP: ${days}d ${hours}h ${mins}m ${secs}s`;
+  }, 1000);
 }
 function renderCalendar() {
   document.getElementById("app").innerHTML = "<h2>Kalendarz sezonu</h2><p>Ładowanie...</p>";
