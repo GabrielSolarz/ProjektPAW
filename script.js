@@ -120,59 +120,125 @@ function renderStandings() {
 function renderWinners() {
   document.getElementById("app").innerHTML = "<h2>Zwycięzcy wyścigów</h2><p>Ładowanie...</p>";
 }
-async function renderDrivers() {
+let allDriversCached = [];
+
+async function renderDrivers(page = 1) {
   const app = document.getElementById("app");
-  app.innerHTML = "<h2>Kierowcy</h2><p>Pobieranie danych z toru...</p>";
+  const API_SPORTS_KEY = "f8d0ae2e7bb139f17feecd13494c1d44";
+  const itemsPerPage = 10;
+
+  app.innerHTML = "<h2>Kierowcy</h2><p>Ładowanie strony ${page}...</p>";
 
   try {
-    const response = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
-    const drivers = await response.json();
 
+    if (allDriversCached.length === 0) {
+      const openF1Res = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
+      const openF1Data = await openF1Res.json();
+      allDriversCached = Array.from(new Map(openF1Data.map(d => [d.driver_number, d])).values());
+    }
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const driversToShow = allDriversCached.slice(start, end);
 
-    const uniqueDrivers = Array.from(new Map(drivers.map(d => [d.driver_number, d])).values());
+    let html = `<h2>Kierowcy F1 (Strona ${page})</h2><div class="drivers-grid">`;
+    for (const d of driversToShow) {
+      const sportsRes = await fetch(`https://v1.formula-1.api-sports.io/drivers?search=${d.last_name}`, {
+        method: "GET",
+        headers: {
+          "x-rapidapi-key": API_SPORTS_KEY,
+          "x-rapidapi-host": "v1.formula-1.api-sports.io"
+        }
+      });
+      const sportsData = await sportsRes.json();
+      const sportsDetail = (sportsData.response && sportsData.response.length > 0) ? sportsData.response[0] : null;
 
-    let html = "<h2>Kierowcy (Ostatnia sesja)</h2><div class='grid'>";
-    uniqueDrivers.forEach(d => {
+      const driverImg = sportsDetail ? sportsDetail.image : 'https://placehold.co/200x200/15151e/white?text=No+Photo';
+
       html += `
-        <div class="driver-card" style="border-left-color: #${d.team_colour}">
-          <a> </a><strong> ${d.full_name}</strong> (${d.driver_number})<br>
-          <small>${d.team_name}</small>
+        <div class="driver-card" style="border-left: 6px solid #${d.team_colour}">
+          <div class="driver-content">
+            <img src="${driverImg}" class="driver-photo" alt="${d.full_name}">
+            <div class="driver-info">
+              <span class="driver-number">#${d.driver_number}</span>
+              <h3 class="driver-name">${d.full_name}</h3>
+              <p class="driver-team">${d.team_name}</p>
+              ${sportsDetail ? `
+                <div class="driver-stats-extra">
+                  <span>Tytuły: <strong>${sportsDetail.world_championships}</strong></span>
+                  <span>Podia: <strong>${sportsDetail.podiums}</strong></span>
+                </div>` : ''}
+            </div>
+          </div>
         </div>`;
-    });
-    app.innerHTML = html + "</div>";
-  } catch (e) {
-    app.innerHTML = "<p>Błąd ładowania kierowców. Sprawdź połączenie.</p>";
+    }
+
+    html += `</div><div class="pagination-container">`;
+    if (page > 1) html += `<button onclick="renderDrivers(${page - 1})" class="nav-btn">Poprzednia 10</button>`;
+    if (end < allDriversCached.length) html += `<button onclick="renderDrivers(${page + 1})" class="nav-btn">Następna 10</button>`;
+    html += `</div>`;
+
+    app.innerHTML = html;
+
+  } catch (error) {
+    app.innerHTML = "<p>Błąd ładowania. Możliwe, że wyczerpałeś limit 10 zapytań na minutę. Odczekaj chwilę.</p>";
   }
 }
-
 async function renderConstructors() {
   const app = document.getElementById("app");
-  app.innerHTML = "<h2>Konstruktorzy</h2><p>Pobieranie listy zespołów...</p>";
+  app.innerHTML = "<h2>Konstruktorzy</h2><p>Łączenie danych z wielu źródeł...</p>";
+
+  const API_SPORTS_KEY = "f8d0ae2e7bb139f17feecd13494c1d44"
 
   try {
-    const response = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
-    const data = await response.json();
-    const teamsMap = new Map();
-    data.forEach(d => {
-      if (!teamsMap.has(d.team_name)) {
-        teamsMap.set(d.team_name, { name: d.team_name, color: d.team_colour });
+    const openF1Res = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
+    const openF1Data = await openF1Res.json();
+    const openF1Teams = new Map();
+    openF1Data.forEach(d => {
+      if (!openF1Teams.has(d.team_name)) {
+        openF1Teams.set(d.team_name, { name: d.team_name, color: d.team_colour });
       }
     });
 
-    let html = '<h2>Zespoły F1 (Sezon 2025)</h2><div class="constructors-list">';
+    const sportsRes = await fetch('https://v1.formula-1.api-sports.io/teams', {
+      method: "GET",
+      headers: {
+        "x-rapidapi-key": API_SPORTS_KEY,
+        "x-rapidapi-host": "v1.formula-1.api-sports.io"
+      }
+    });
+    const sportsData = await sportsRes.json();
+    const allTeamsFromSports = sportsData.response;
 
-    teamsMap.forEach(team => {
+    let html = '<h2>Zespoły Formuły 1</h2><div class="constructors-list">';
 
+    openF1Teams.forEach(openTeam => {
+      const sportsDetail = allTeamsFromSports.find(t => 
+        openTeam.name.toLowerCase().includes(t.name.toLowerCase()) || 
+        t.name.toLowerCase().includes(openTeam.name.toLowerCase())
+      );
       html += `
-        <div class="constructor-card" style="border-left-color: #${team.color}">
-          <h3 class="constructor-name">${team.name}</h3>
-          <p class="constructor-info">Official F1 Constructor</p>
+        <div class="constructor-card" style="border-left-color: #${openTeam.color}">
+          <div class="constructor-header">
+            ${sportsDetail ? `<img src="${sportsDetail.logo}" class="team-logo" alt="Logo ${openTeam.name}">` : ''}
+            <div>
+              <h3 class="constructor-name">${openTeam.name}</h3>
+              <p class="constructor-info">Baza: ${sportsDetail ? sportsDetail.base : 'Brak danych'}</p>
+            </div>
+          </div>
+          ${sportsDetail ? `
+            <div class="team-tech-details">
+              <p><strong>Szef:</strong> ${sportsDetail.director}</p>
+              <p><strong>Silnik:</strong> ${sportsDetail.engine}</p>
+              <p><strong>Nazwa bolidu:</strong> ${sportsDetail.chassis}</p>
+            </div>
+          ` : ''}
         </div>`;
     });
 
     app.innerHTML = html + "</div>";
   } catch (error) {
-    app.innerHTML = "<p>Błąd pobierania danych o konstruktorach.</p>";
+    console.error("Błąd podczas łączenia API:", error);
+    app.innerHTML = "<p>Błąd podczas pobierania danych zespołów.</p>";
   }
 }
 
