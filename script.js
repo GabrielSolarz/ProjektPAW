@@ -46,16 +46,12 @@ function renderHome() {
       <div id="countdown" style="background: #111; color: #e10600; padding: 1rem; border-radius: 8px; text-align: center; margin-bottom: 1rem; font-family: monospace; font-size: 1.5rem;">
         Ładowanie czasu do GP...
       </div>
-      <p>Ta aplikacja prezentuje dane o sezonie Formuły 1 z <a href="https://openf1.org">OpenF1 API</a>.</p>
-      <ul>
-          <li><a href="/drivers" data-route>Lista Kierowców</a></li> 
-          <li><a href="/constructors" data-route>Lista Konstruktorów</a></li> 
-          <li><a href="/circuits" data-route>Lista Torów</a></li>
-          <li><a href="/calendar" data-route>Kalendarz</a></li>
-          <li><a href="/standings" data-route>Klasyfikacje</a></li>
-          <li><a href="/winners" data-route>Zwycięzcy</a></li>
-          <li><a href="/basics" data-route>F1 Dla początkujących</a></li> </ul>
-      </ul>
+      <h1>Czym jest F1Results?</h1>
+      <p>F1Results to aplikacja, która pozwala na przeglądanie danych z wyścigów Formuły 1. Możesz tutaj znaleźć informacje
+      o kierowcach, zespołach, torach, kalendarzu sezonu, klasyfikacjach i zwycięzcach wyścigów.</p>
+      <p>Dodatkowo, w sekcji "F1 dla Topornych" znajdziesz słowniczek pojęć, które pomogą Ci zrozumieć świat Formuły 1.</p>
+      <h3>Jak korzystać z aplikacji?</h3>
+      <p>Wybierz jedną z sekcji powyżej, aby przeglądać dane.</p>
     </section>
   `;
   startCountdown();
@@ -180,8 +176,63 @@ async function renderConstructors() {
   }
 }
 
-function renderCircuits() {
-  document.getElementById("app").innerHTML = "<h2>Dane torów</h2><p>Ładowanie danych o torach wyścigowych...</p>";
+async function renderCircuits() {
+  const app = document.getElementById("app");
+  app.innerHTML = "<h2>Tory wyścigowe</h2><p>Pobieranie szczegółowych danych z API-Sports...</p>";
+
+  const API_KEY = "f8d0ae2e7bb139f17feecd13494c1d44"
+
+  try {
+    const response = await fetch('https://v1.formula-1.api-sports.io/circuits', {
+      method: 'GET',
+      headers: {
+        'x-rapidapi-key': API_KEY,
+        'x-rapidapi-host': 'v1.formula-1.api-sports.io'
+      }
+    });
+
+    const result = await response.json();
+    const circuits = result.response;
+
+    let html = '<h2>Tory Formuły 1 (Również te historyczne)</h2><div class="circuits-grid">';
+
+    circuits.forEach(circuit => {
+      const trackName = circuit.name;
+      const trackImg = circuit.image;
+      const location = `${circuit.competition.location.city}, ${circuit.competition.location.country}`;
+      const lapRecord = circuit.lap_record;
+
+      html += `
+        <div class="circuit-card">
+          <div class="circuit-image-container">
+            <img src="${trackImg}" 
+                 alt="Nitka toru ${trackName}" 
+                 class="circuit-image"
+                 onerror="this.onerror=null; this.src='https://placehold.co/400x200/15151e/white?text=F1+Circuit';">
+          </div>
+          <div class="circuit-details">
+            <span class="circuit-name">${trackName}</span>
+            <span class="circuit-location">${location}</span>
+            <div class="circuit-stats">
+              <p><strong>Długość:</strong> ${circuit.length}</p>
+              <p><strong>Liczba okrążeń:</strong> ${circuit.laps}</p>
+              ${lapRecord.time ? `
+                <div class="lap-record">
+                  <strong>Rekord:</strong> ${lapRecord.time} 
+                  <small>(${lapRecord.driver}, ${lapRecord.year})</small>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        </div>`;
+    });
+
+    app.innerHTML = html + "</div>";
+  } catch (error) {
+    console.error("Błąd API-Sports:", error);
+    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się pobrać danych. Sprawdź swój klucz API.</p>";
+  }
+  footer.innerHTML ="<p> Dane pochodzą z <a>api-sports.io</a></p>"
 }
 
 function renderBasics() {
@@ -205,7 +256,7 @@ function renderBasics() {
     { term: "Telemetria", definition: "System zdalnego przesyłania danych z czujników bolidu do inżynierów w czasie rzeczywistym." }
   ];
 
-  // Sortowanie alfabetyczne
+
   glossary.sort((a, b) => a.term.localeCompare(b.term));
 
   let html = `
