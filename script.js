@@ -5,7 +5,6 @@ const routes = {
   "/constructors": renderConstructors, 
   "/circuits": renderCircuits,     
   "/calendar": renderCalendar,
-  "/standings": renderStandings,
   "/winners": renderWinners,
   "/basics": renderBasics,        
 };
@@ -70,29 +69,44 @@ function startCountdown() {
     if (el) el.innerHTML = `Do następnego GP: ${days}d ${hours}h ${mins}m ${secs}s`;
   }, 1000);
 }
-async function renderCalendar() {
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+let calendarCache = [];
+
+async function renderCalendar(page = 1) {
   const app = document.getElementById("app");
-  app.innerHTML = "<h2>Kalendarz sezonu</h2><p>Pobieranie harmonogramu wyścigów 2025...</p>";
+  const itemsPerPage = 8;
+
+  app.innerHTML = `<h2>Kalendarz sezonu 2025</h2><p>Ładowanie harmonogramu (Strona ${page})...</p>`;
 
   try {
-    const response = await fetch('https://api.openf1.org/v1/sessions?year=2025');
-    const sessions = await response.json();
+    if (calendarCache.length === 0) {
+      const response = await fetch('https://api.openf1.org/v1/sessions?year=2025');
+      if (!response.ok) throw new Error("Błąd API");
 
-    const races = sessions
-      .filter(s => s.session_name === "Race")
-      .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
-
-    if (races.length === 0) {
-        app.innerHTML = "<h2>Kalendarz F1 2025</h2><p>Harmonogram na sezon 2025 nie jest jeszcze dostępny w API.</p>";
-        return;
+      const sessions = await response.json();
+      calendarCache = sessions
+        .filter(s => s.session_name === "Race")
+        .sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+      await sleep(300); 
     }
 
+    if (calendarCache.length === 0) {
+      app.innerHTML = "<h2>Kalendarz F1 2025</h2><p>Harmonogram na sezon 2025 nie jest jeszcze dostępny.</p>";
+      return;
+    }
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const racesToShow = calendarCache.slice(start, end);
+    const totalPages = Math.ceil(calendarCache.length / itemsPerPage);
     let html = '<h2>Kalendarz F1 2025</h2><div class="calendar-list">';
 
-    races.forEach(race => {
+    racesToShow.forEach(race => {
       const raceDate = new Date(race.date_start).toLocaleDateString('pl-PL', {
         day: '2-digit',
-        month: '2-digit'
+        month: '2-digit',
+        year: 'numeric'
       });
 
       html += `
@@ -100,25 +114,94 @@ async function renderCalendar() {
           <div class="race-date">${raceDate}</div>
           <div class="race-info">
             <div class="race-main-info">
-              <span class="race-location">${race.location}</span>
+              <span class="race-location"><strong>${race.location}</strong></span>
               <span class="race-country">${race.country_name}</span>
             </div>
-            <span class="race-circuit">Nazwa toru: ${race.circuit_short_name}</span>
+            <span class="race-circuit">Tor: ${race.circuit_short_name}</span>
           </div>
         </div>`;
     });
+    html += `</div>
+      <div class="pagination-container">
+        ${page > 1 ? `<button onclick="renderCalendar(${page - 1})" class="nav-btn">Poprzednie</button>` : ''}
+        <span class="page-info">Strona ${page} z ${totalPages}</span>
+        ${end < calendarCache.length ? `<button onclick="renderCalendar(${page + 1})" class="nav-btn">Następne</button>` : ''}
+      </div>`;
 
-    app.innerHTML = html + "</div>";
+    app.innerHTML = html;
+
   } catch (error) {
-    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się załadować danych.</p>";
+    console.error("Błąd kalendarza:", error);
+    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się załadować danych. Spróbuj odświeżyć stronę.</p>";
   }
 }
-function renderStandings() {
-  document.getElementById("app").innerHTML = "<h2>Klasyfikacje</h2><p>Ładowanie...</p>";
-}
 
-function renderWinners() {
-  document.getElementById("app").innerHTML = "<h2>Zwycięzcy wyścigów</h2><p>Ładowanie...</p>";
+let winnersCache = []; 
+
+async function renderWinners(page = 1) {
+  const app = document.getElementById("app");
+  const itemsPerPage = 5; 
+  app.innerHTML = `<h2>Zwycięzcy</h2><p>Pobieranie wyników i danych kierowców (Strona ${page})...</p>`;
+
+  try {
+    if (winnersCache.length === 0) {
+      const res = await fetch('https://api.openf1.org/v1/sessions?year=2025&session_name=Race');
+      winnersCache = await res.json();
+      winnersCache.sort((a, b) => new Date(a.date_start) - new Date(b.date_start));
+    }
+
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const sessionsToShow = winnersCache.slice(start, end);
+
+    let html = `<h2>Wyniki Sezonu 2024 (Strona ${page})</h2><div class="winners-list">`;
+
+    for (const session of sessionsToShow) {
+
+      const posRes = await fetch(`https://api.openf1.org/v1/position?session_key=${session.session_key}&position=1`);
+      if (!posRes.ok) continue;
+      const positions = await posRes.json();
+
+      if (Array.isArray(positions) && positions.length > 0) {
+        const winnerEntry = positions[positions.length - 1];
+        const driverNum = winnerEntry.driver_number;
+        const driverRes = await fetch(`https://api.openf1.org/v1/drivers?driver_number=${driverNum}&session_key=${session.session_key}`);
+        const driverData = await driverRes.json();
+
+        const d = (Array.isArray(driverData) && driverData.length > 0) ? driverData[0] : null;
+
+        const fullName = d ? d.full_name : `Kierowca #${driverNum}`;
+        const teamName = d ? d.team_name : "Brak danych o zespole";
+        const teamColor = d ? d.team_colour : "ccc";
+
+        html += `
+          <div class="winner-item" style="border-left: 6px solid #${teamColor}">
+            <div class="winner-track-info">
+              <span class="winner-location"><strong>${session.location}</strong></span>
+              <span class="winner-country">${session.country_name}</span>
+            </div>
+            <div class="winner-driver-box">
+              <span class="winner-tag">ZWYCIĘZCA</span>
+              <span class="winner-name">${fullName}</span>
+              <span class="winner-team-text">${teamName}</span>
+            </div>
+          </div>`;
+      }
+      await new Promise(res => setTimeout(res, 500));
+    }
+    const totalPages = Math.ceil(winnersCache.length / itemsPerPage);
+    html += `</div><div class="pagination-container">`;
+    if (page > 1) html += `<button onclick="renderWinners(${page - 1})" class="nav-btn">Poprzednie</button>`;
+    html += `<span class="page-info">Strona ${page} z ${totalPages}</span>`;
+    if (end < winnersCache.length) html += `<button onclick="renderWinners(${page + 1})" class="nav-btn">Następne</button>`;
+    html += `</div>`;
+
+    app.innerHTML = html;
+
+  } catch (error) {
+    console.error(error);
+    app.innerHTML = "<p>Wystąpił błąd. Spróbuj odświeżyć stronę lub odczekać chwilę (limity API).</p>";
+  }
 }
 let allDriversCached = [];
 
@@ -127,7 +210,7 @@ async function renderDrivers(page = 1) {
   const API_SPORTS_KEY = "f8d0ae2e7bb139f17feecd13494c1d44";
   const itemsPerPage = 10;
 
-  app.innerHTML = "<h2>Kierowcy</h2><p>Ładowanie strony ${page}...</p>";
+  app.innerHTML = "<h2>Kierowcy</h2><p>Ładowanie danych kierowców...</p>";
 
   try {
 
@@ -242,27 +325,37 @@ async function renderConstructors() {
   }
 }
 
-async function renderCircuits() {
-  const app = document.getElementById("app");
-  app.innerHTML = "<h2>Tory wyścigowe</h2><p>Pobieranie szczegółowych danych z API-Sports...</p>";
+let circuitsCache = []; 
 
-  const API_KEY = "f8d0ae2e7bb139f17feecd13494c1d44"
+async function renderCircuits(page = 1) {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  const app = document.getElementById("app");
+  const itemsPerPage = 10;
+  const API_KEY = "f8d0ae2e7bb139f17feecd13494c1d44";
+
+  app.innerHTML = `<h2>Tory wyścigowe</h2><p>Pobieranie danych z API-Sports (Strona ${page})...</p>`;
 
   try {
-    const response = await fetch('https://v1.formula-1.api-sports.io/circuits', {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-key': API_KEY,
-        'x-rapidapi-host': 'v1.formula-1.api-sports.io'
-      }
-    });
+    if (circuitsCache.length === 0) {
+      const response = await fetch('https://v1.formula-1.api-sports.io/circuits', {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-key': API_KEY,
+          'x-rapidapi-host': 'v1.formula-1.api-sports.io'
+        }
+      });
 
-    const result = await response.json();
-    const circuits = result.response;
+      const result = await response.json();
+      circuitsCache = result.response;
+    }
+    const start = (page - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const circuitsToShow = circuitsCache.slice(start, end);
+    const totalPages = Math.ceil(circuitsCache.length / itemsPerPage);
 
-    let html = '<h2>Tory Formuły 1 (Również te historyczne)</h2><div class="circuits-grid">';
+    let html = '<h2>Tory Formuły 1 (Strona ' + page + ')</h2><div class="circuits-grid">';
 
-    circuits.forEach(circuit => {
+    circuitsToShow.forEach(circuit => {
       const trackName = circuit.name;
       const trackImg = circuit.image;
       const location = `${circuit.competition.location.city}, ${circuit.competition.location.country}`;
@@ -282,7 +375,7 @@ async function renderCircuits() {
             <div class="circuit-stats">
               <p><strong>Długość:</strong> ${circuit.length}</p>
               <p><strong>Liczba okrążeń:</strong> ${circuit.laps}</p>
-              ${lapRecord.time ? `
+              ${lapRecord && lapRecord.time ? `
                 <div class="lap-record">
                   <strong>Rekord:</strong> ${lapRecord.time} 
                   <small>(${lapRecord.driver}, ${lapRecord.year})</small>
@@ -292,13 +385,19 @@ async function renderCircuits() {
           </div>
         </div>`;
     });
+    html += `</div>
+      <div class="pagination-container">
+        ${page > 1 ? `<button onclick="renderCircuits(${page - 1})" class="nav-btn">Poprzednie</button>` : ''}
+        <span class="page-info">Strona ${page} z ${totalPages}</span>
+        ${end < circuitsCache.length ? `<button onclick="renderCircuits(${page + 1})" class="nav-btn">Następne</button>` : ''}
+      </div>`;
 
-    app.innerHTML = html + "</div>";
+    app.innerHTML = html;
+
   } catch (error) {
     console.error("Błąd API-Sports:", error);
-    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się pobrać danych. Sprawdź swój klucz API.</p>";
+    app.innerHTML = "<h2>Błąd</h2><p>Nie udało się pobrać danych torów. Sprawdź limity API.</p>";
   }
-  footer.innerHTML ="<p> Dane pochodzą z <a>api-sports.io</a></p>"
 }
 
 function renderBasics() {
