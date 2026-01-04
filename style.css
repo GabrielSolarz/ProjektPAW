@@ -452,27 +452,88 @@ nav ul li a.active {
   color: #15151e;
 }
 
-
-
-
-
-
+img {
+    max-width: 100%;
+    height: auto;
+}
 
 
 
 /* Responsywność */
 
 @media (max-width: 768px) {
-  main {
-      padding: 1rem;
-    }
 
     nav ul {
-      flex-direction: column;
-      align-items: center;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 10px 0;
+    }
+
+    nav ul li a {
+        display: block;
+        padding: 8px;
+        border-bottom: 1px solid #333;
+    }
+
+    main {
+        width: 95%;
+        padding: 1rem;
+        margin: 0.5rem auto;
+    }
+
+
+    .driver-content {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .driver-photo {
+        margin: 0 0 15px 0 !important;
+    }
+
+    .winner-item {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+        padding: 15px;
+    }
+
+    .winner-driver-box {
+        text-align: center;
+    }
+
+    .glossary-container, .circuits-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .search-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    #driverSearchInput {
+        width: 100% !important;
+    }
+
+    .team-tech-details {
+        grid-template-columns: 1fr;
     }
 
     header h1 {
-      font-size: 1.3rem;
+        font-size: 1.5rem;
     }
-  }
+}
+
+@media (max-width: 480px) {
+    .race-main-info {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .pagination-container {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
