@@ -205,7 +205,7 @@ async function renderWinners(page = 1) {
 }
 let allDriversCached = [];
 
-async function renderDrivers(page = 1) {
+async function renderDrivers(page = 1, searchTerm = "") {
   const app = document.getElementById("app");
   const API_SPORTS_KEY = "f8d0ae2e7bb139f17feecd13494c1d44";
   const itemsPerPage = 10;
@@ -213,17 +213,40 @@ async function renderDrivers(page = 1) {
   app.innerHTML = "<h2>Kierowcy</h2><p>Ładowanie danych kierowców...</p>";
 
   try {
-
     if (allDriversCached.length === 0) {
       const openF1Res = await fetch('https://api.openf1.org/v1/drivers?session_key=latest');
       const openF1Data = await openF1Res.json();
       allDriversCached = Array.from(new Map(openF1Data.map(d => [d.driver_number, d])).values());
     }
+
+    // Filtrowanie na podstawie wpisanej frazy
+    let filteredDrivers = allDriversCached;
+    if (searchTerm) {
+      filteredDrivers = allDriversCached.filter(d => 
+        d.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
     const start = (page - 1) * itemsPerPage;
     const end = start + itemsPerPage;
-    const driversToShow = allDriversCached.slice(start, end);
+    const driversToShow = filteredDrivers.slice(start, end);
+    const totalPages = Math.ceil(filteredDrivers.length / itemsPerPage);
 
-    let html = `<h2>Kierowcy F1 (Strona ${page})</h2><div class="drivers-grid">`;
+    // Formularz wyszukiwania
+    let html = `
+      <h2>Kierowcy F1 (Strona ${page})</h2>
+      <div class="search-container" style="margin-bottom: 20px;">
+        <input type="text" id="driverSearchInput" placeholder="Szukaj kierowcy..." value="${searchTerm}" style="padding: 8px; width: 250px; border: 1px solid #ccc; border-radius: 4px;">
+        <button onclick="handleDriverSearch()" class="nav-btn" style="padding: 8px 15px;">Szukaj</button>
+        <p id="searchError" style="color: red; font-size: 0.85rem; margin-top: 5px; display: none;"></p>
+      </div>
+      <div class="drivers-grid">
+    `;
+
+    if (driversToShow.length === 0) {
+      html += `<p>Nie znaleziono kierowców pasujących do kryteriów.</p>`;
+    }
+
     for (const d of driversToShow) {
       const sportsRes = await fetch(`https://v1.formula-1.api-sports.io/drivers?search=${d.last_name}`, {
         method: "GET",
@@ -234,17 +257,16 @@ async function renderDrivers(page = 1) {
       });
       const sportsData = await sportsRes.json();
       const sportsDetail = (sportsData.response && sportsData.response.length > 0) ? sportsData.response[0] : null;
-
       const driverImg = sportsDetail ? sportsDetail.image : 'https://placehold.co/200x200/15151e/white?text=No+Photo';
 
       html += `
         <div class="driver-card" style="border-left: 6px solid #${d.team_colour}">
           <div class="driver-content">
-            <img src="${driverImg}" class="driver-photo" alt="${d.full_name}">
+            <img src="${driverImg}" class="driver-photo" alt="${d.full_name}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 50%; margin-right: 15px;">
             <div class="driver-info">
               <span class="driver-number">#${d.driver_number}</span>
-              <h3 class="driver-name">${d.full_name}</h3>
-              <p class="driver-team">${d.team_name}</p>
+              <h3 class="driver-name" style="margin: 0;">${d.full_name}</h3>
+              <p class="driver-team" style="margin: 5px 0;">${d.team_name}</p>
               ${sportsDetail ? `
                 <div class="driver-stats-extra">
                   <span>Tytuły: <strong>${sportsDetail.world_championships}</strong></span>
@@ -256,14 +278,34 @@ async function renderDrivers(page = 1) {
     }
 
     html += `</div><div class="pagination-container">`;
-    if (page > 1) html += `<button onclick="renderDrivers(${page - 1})" class="nav-btn">Poprzednia 10</button>`;
-    if (end < allDriversCached.length) html += `<button onclick="renderDrivers(${page + 1})" class="nav-btn">Następna 10</button>`;
+    if (page > 1) html += `<button onclick="renderDrivers(${page - 1}, '${searchTerm}')" class="nav-btn">Poprzednia 10</button>`;
+    if (end < filteredDrivers.length) html += `<button onclick="renderDrivers(${page + 1}, '${searchTerm}')" class="nav-btn">Następna 10</button>`;
     html += `</div>`;
 
     app.innerHTML = html;
 
+    document.getElementById("driverSearchInput").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") handleDriverSearch();
+    });
+
   } catch (error) {
-    app.innerHTML = "<p>Błąd ładowania. Możliwe, że wyczerpałeś limit 10 zapytań na minutę. Odczekaj chwilę.</p>";
+    app.innerHTML = "<p>Błąd ładowania danych.</p>";
+  }
+}
+function handleDriverSearch() {
+  const input = document.getElementById("driverSearchInput");
+  const errorEl = document.getElementById("searchError");
+  const query = input.value;
+  const forbiddenChars = /[!@#$%^&*()_+=[\]{};':"\\|,.<>/?\d]/;
+
+  if (forbiddenChars.test(query)) {
+    errorEl.innerText = "Znaki specjalne oraz cyfry są niedozwolone w wyszukiwaniu nazwisk.";
+    errorEl.style.display = "block";
+    input.style.border = "2px solid red";
+  } else {
+    errorEl.style.display = "none";
+    input.style.border = "1px solid #ccc";
+    renderDrivers(1, query); 
   }
 }
 async function renderConstructors() {
